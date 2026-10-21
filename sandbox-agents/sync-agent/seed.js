@@ -19,8 +19,12 @@ const S3_BUCKET = process.env.S3_BUCKET;
 const WATCH_DIR = '/workspace';
 const TEMPLATE_DIR = '/template';
 const SKIP = new Set([ 'node_modules', '.git', 'dist', '.DS_Store' ]);
+const S3_ENABLED = Boolean(
+    S3_BUCKET && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+);
 
 const sandboxExistsInS3 = async () => {
+    if (!S3_ENABLED) return false;
     try {
         const response = await s3.send(new ListObjectsV2Command({
             Bucket: S3_BUCKET,
@@ -69,11 +73,13 @@ const seedFromTemplate = async () => {
             } else {
                 await mkdir(path.dirname(destPath), { recursive: true });
                 await copyFile(srcPath, destPath);
-                await s3.send(new PutObjectCommand({
-                    Bucket: S3_BUCKET,
-                    Key: `${SANDBOX_ID}/${relativePath}`,
-                    Body: createReadStream(destPath),
-                }));
+                if (S3_ENABLED) {
+                    await s3.send(new PutObjectCommand({
+                        Bucket: S3_BUCKET,
+                        Key: `${SANDBOX_ID}/${relativePath}`,
+                        Body: createReadStream(destPath),
+                    }));
+                }
                 console.log('seeded:', relativePath);
             }
         }

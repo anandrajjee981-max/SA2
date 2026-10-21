@@ -27,5 +27,20 @@ spec:
             name: frontend-service
             port:
               number: 80
-
-      
+      - pathType: Prefix
+        path: /router/health
+        backend:
+          service:
+            name: router-service
+            port:
+              number: 80
+  - host: "*.preview.localhost"
+    http:
+      paths:
+      - pathType: Prefix
+        path : /
+        backend:
+          service:
+            name: router-service
+            port:
+              number: 80

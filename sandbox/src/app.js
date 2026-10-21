@@ -17,7 +17,7 @@ app.get('/api/sandbox/health', (req, res) => {
 app.post('/api/sandbox/create', async (req, res) => {
     const sandboxId = uuid();
     try {
-        await createPod(sandboxId);
+        await createPod(sandboxId, process.env.S3_BUCKET);
         await createService(sandboxId);
         res.status(201).json({ message: 'Sandbox created successfully', sandboxId ,previewUrl: `http://${sandboxId}.preview.localhost`});
     } catch (error) {

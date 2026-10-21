@@ -10,6 +10,9 @@ const s3 = new S3Client({
 const SANDBOX_ID = process.env.SANDBOX_ID;
 const S3_BUCKET = process.env.S3_BUCKET;
 const WATCH_DIR = '/workspace';
+const S3_ENABLED = Boolean(
+    S3_BUCKET && process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+);
 
 const getS3Key = (filePath) => {
     const relative = path.relative(WATCH_DIR, filePath);
@@ -17,6 +20,7 @@ const getS3Key = (filePath) => {
 };
 
 const uploadFile = async (filePath) => {
+    if (!S3_ENABLED) return;
     try {
         const key = getS3Key(filePath);
         await s3.send(new PutObjectCommand({
@@ -31,6 +35,7 @@ const uploadFile = async (filePath) => {
 };
 
 const deleteFile = async (filePath) => {
+    if (!S3_ENABLED) return;
     try {
         const key = getS3Key(filePath);
         await s3.send(new DeleteObjectCommand({

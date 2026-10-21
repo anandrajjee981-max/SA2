@@ -10,6 +10,6 @@ COPY sandbox-agents/sync-agent/seed.js .
 COPY sandbox-agents/sync-agent/watch.js .
 
 # bake template files in for new sandbox seeding
-COPY template /template
+COPY sandbox/template /template
 
 CMD ["node", "watch.js"]

@@ -11,7 +11,7 @@ RUN apk add --no-cache \
     g++ \
     linux-headers
 
-RUN npm install
+RUN npm_config_nodedir=/usr/local npm install
 
 COPY . .
 

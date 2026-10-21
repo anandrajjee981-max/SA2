@@ -32,7 +32,7 @@ build:
 
 
   - image: template
-    context: template/
+    context: sandbox/template
     docker:
       dockerfile: dockerfile
 
