@@ -74,11 +74,15 @@ const seedFromTemplate = async () => {
                 await mkdir(path.dirname(destPath), { recursive: true });
                 await copyFile(srcPath, destPath);
                 if (S3_ENABLED) {
-                    await s3.send(new PutObjectCommand({
-                        Bucket: S3_BUCKET,
-                        Key: `${SANDBOX_ID}/${relativePath}`,
-                        Body: createReadStream(destPath),
-                    }));
+                    try {
+                        await s3.send(new PutObjectCommand({
+                            Bucket: S3_BUCKET,
+                            Key: `${SANDBOX_ID}/${relativePath}`,
+                            Body: createReadStream(destPath),
+                        }));
+                    } catch (err) {
+                        console.error('S3 upload error (continuing):', err.message);
+                    }
                 }
                 console.log('seeded:', relativePath);
             }

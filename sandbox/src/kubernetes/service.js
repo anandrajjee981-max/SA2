@@ -1,114 +1,128 @@
-import { k8sApi, k8sNetworkingApi } from "./config.js";
-import { NAMESPACE } from "../utils/constant.js";
+import {k8sApi , k8sNetworking} from './config.js';
 
-export const createService = async (sandboxId) => {
-    const serviceManifest = {
-        metadata: {
-            name: `sandbox-service-${sandboxId}`,
-            namespace: NAMESPACE,
-        },
-        spec: {
-            selector: {
-                app: `sandbox-pod-${sandboxId}`,
+export const createservice = async(sandboxid)=>{
+    const servicebody = {
+        metadata:{
+            name: `sandbox-service-${sandboxid}`,
+            labels:{
+                app: sandboxid,
             },
-            ports: [
+        },
+        spec:{
+            selector:{
+                app: sandboxid,
+            },
+            ports:[
                 {
-                    name: "agent-http",
-                    protocol: "TCP",
                     port: 3000,
-                    targetPort: 3000,
-                },
-                {
-                    name: "vite-http",
-                    protocol: "TCP",
-                    port: 5173,
                     targetPort: 5173,
-                }
+                    name: "http",
+                },
             ],
-            type: "ClusterIP",
-        }
+            type: "LoadBalancer",
+        },
     };
 
-    try {
-        const response = await k8sApi.createNamespacedService({
-            namespace: NAMESPACE,
-            body: serviceManifest,
-        });
-        return { response };
-    } catch (error) {
-        console.error("Error creating service:", error);
-        throw error;
+    try{
+        const res = await k8sApi.createNamespacedService({ namespace: "default", body: servicebody });
+        console.log("service created successfully");
+        return res;
     }
-};
-
-export const createSandboxIngress = async (sandboxId) => {
-    const previewHost = `${sandboxId}.preview.localhost`;
-    const agentHost = `${sandboxId}.agent.localhost`;
-
-    const ingressManifest = {
-        metadata: {
-            name: `sandbox-ingress-${sandboxId}`,
-            namespace: NAMESPACE,
-            annotations: {
-                "nginx.ingress.kubernetes.io/proxy-read-timeout": "3600",
-                "nginx.ingress.kubernetes.io/proxy-send-timeout": "3600",
-                "nginx.ingress.kubernetes.io/proxy-http-version": "1.1",
-            },
-        },
-        spec: {
-            ingressClassName: "nginx",
-            rules: [
-                // Vite preview
-                {
-                    host: previewHost,
-                    http: {
-                        paths: [
-                            {
-                                pathType: "Prefix",
-                                path: "/",
-                                backend: {
-                                    service: {
-                                        name: `sandbox-service-${sandboxId}`,
-                                        port: { number: 5173 },
-                                    },
-                                },
-                            },
-                        ],
-                    },
-                },
-                // Comm agent + Socket.io
-                {
-                    host: agentHost,
-                    http: {
-                        paths: [
-                            {
-                                pathType: "Prefix",
-                                path: "/",
-                                backend: {
-                                    service: {
-                                        name: `sandbox-service-${sandboxId}`,
-                                        port: { number: 3000 },
-                                    },
-                                },
-                            },
-                        ],
-                    },
-                },
-            ],
-        },
-    };
-
-    try {
-        await k8sNetworkingApi.createNamespacedIngress({
-            namespace: NAMESPACE,
-            body: ingressManifest,
-        });
-        return {
-            previewUrl: `http://${previewHost}`,
-            agentUrl: `http://${agentHost}`,
-        };
-    } catch (err) {
-        console.error("Error creating ingress:", err);
+    catch(err){
+        console.log("service creation failed", err);
         throw err;
     }
+}
+
+
+export const waitForServiceReachable = async (serviceName, port = 3000, timeoutMs = 60000) => {
+    const deadline = Date.now() + timeoutMs;
+    let lastError = "no attempt made";
+
+    while (Date.now() < deadline) {
+        try {
+            const res = await fetch(`http://${serviceName}:${port}/`, {
+                signal: AbortSignal.timeout(3000),
+            });
+
+            if (res.status < 500) {
+                console.log(`service ${serviceName} is reachable (status ${res.status})`);
+                return;
+            }
+
+            lastError = `status ${res.status}`;
+        } catch (err) {
+            lastError = err.message;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+
+    throw new Error(`service ${serviceName} is not reachable within ${timeoutMs}ms (${lastError})`);
+}
+
+export const createingress = async(sandboxid) =>{
+ const previewhost = `${sandboxid}-preview.localhost`
+ const agenthost = `${sandboxid}-agent.localhost`
+const ingressmanifest = {
+    metadata:{
+        name: `sandbox-ingress-${sandboxid}`,
+        annotations:{
+              "nginx.ingress.kubernetes.io/proxy-read-timeout": "3600",
+                "nginx.ingress.kubernetes.io/proxy-send-timeout": "3600",
+                "nginx.ingress.kubernetes.io/proxy-http-version": "1.1",
+        }
+    },  
+    spec:{
+     ingressClassName: "nginx",
+     rules:[{
+        host: previewhost,
+        http:{
+            paths:[
+                {
+                    path: '/',
+                    pathType: 'Prefix',
+                    backend:{
+                        service:{
+                            name: `sandbox-service-${sandboxid}`,
+                            port:{
+                                number: 3000,
+                            },
+                        },
+                    },
+                },
+            ],
+        },
+     },{
+        host: agenthost,
+        http:{
+            paths:[
+                {
+                    path: '/',
+                    pathType: 'Prefix',
+                    backend:{
+                        service:{
+                            name: `sandbox-service-${sandboxid}`,
+                            port:{
+                                number: 3000,
+                            },
+                        },
+                    },
+                },
+            ],
+        },
+     }],
+    },
 };
+
+try{
+    const res = await k8sNetworking.createNamespacedIngress({ namespace: "default", body: ingressmanifest });
+    console.log("ingress created successfully");
+    return res;
+}
+catch(err){
+    console.log("ingress creation failed", err);
+    throw err;
+}
+
+}

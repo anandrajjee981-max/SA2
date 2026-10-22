@@ -1,30 +1,32 @@
 import express from 'express';
-import morgan from 'morgan';
-
-import { createService } from './kubernetes/service.js';
-import { createPod } from './kubernetes/pod.js';
-import { v7 as uuid } from 'uuid';
-
+import{v4 as uuidv4} from 'uuid';
 const app = express();
-app.use(express.json());
+import {createpod, waitForPodReady} from './kubernetes/pod.js';
+import {createservice, waitForServiceReachable} from './kubernetes/service.js';
+import morgan from 'morgan';
+app.get('/api/sandbox/health', (req,res)=>{
+    res.status(200).json({message: 'ok'})
+})
+app.use(morgan("dev"))
+app.post('/api/sandbox/create', async(req,res)=>{
+    const sandboxid = uuidv4();
+    const s3Bucket = `sandbox-${sandboxid}`;
+    try{
+        await createpod(sandboxid, s3Bucket);
+        await createservice(sandboxid);
+        await waitForPodReady(`sandbox-pod-${sandboxid}`);
+        await waitForServiceReachable(`sandbox-service-${sandboxid}`);
+        res.status(200).json({
+            message: 'sandbox created successfully',
+            previewUrl: `http://${sandboxid}.preview.localhost`
 
-app.use(morgan('dev'));
-
-
-app.get('/api/sandbox/health', (req, res) => {
-    res.status(200).json({ message: 'Sandbox service is healthy' });
-});
-app.post('/api/sandbox/create', async (req, res) => {
-    const sandboxId = uuid();
-    try {
-        await createPod(sandboxId, process.env.S3_BUCKET);
-        await createService(sandboxId);
-        res.status(201).json({ message: 'Sandbox created successfully', sandboxId ,previewUrl: `http://${sandboxId}.preview.localhost`});
-    } catch (error) {
-        console.error('Error creating sandbox:', error);
-        res.status(500).json({ message: 'Error creating sandbox', error: error.message });
+        })
     }
-});
+    catch(err){
+        res.status(500).json({message: 'sandbox creation failed', err: err?.message || String(err)})
+    }
+})
+
 
 
 

@@ -1,121 +1,227 @@
-import { k8sApi } from "./config.js";
-import { NAMESPACE } from "../utils/constant.js";
+import { k8sApi } from './config.js';
 
-export const createPod = async (sandboxId, s3Bucket) => {
-    const podManifest = {
+
+export const createpod = async (sandboxid, s3Bucket) => {
+    const podmanifests = {
         metadata: {
-            name: `sandbox-pod-${sandboxId}`,
-            namespace: NAMESPACE,
+            name: `sandbox-pod-${sandboxid}`,
             labels: {
-                app: `sandbox-pod-${sandboxId}`,
+                app: sandboxid,
             },
         },
         spec: {
-            // ── Init container: block Vite + agent until /app is populated ──
-            // Problem: sync-sidecar and main containers start simultaneously.
-            // emptyDir wipes /app, so Vite would start with no files.
-            // This init container polls until sync-sidecar seeds /app, then exits.
             initContainers: [
-                // ── Step 1: seed /app from S3 or template, then exit ──────────
-                // Runs BEFORE Vite and agent start — no deadlock
                 {
-                    name: `sync-init-${sandboxId}`,
-                    image: "sandbox-sync:latest",
-                    imagePullPolicy: "IfNotPresent",
-                    command: [ "node", "seed.js" ],   // separate script, just seeds and exits
-                    volumeMounts: [ { name: "code-volume", mountPath: "/workspace" } ],
+                    name: `sync-init-${sandboxid}`,
+                    image: `sandbox-sync:latest`,
+                    imagePullPolicy: "Always",
+                    command: ["node", "seed.js"],
                     env: [
-                        { name: "SANDBOX_ID", value: sandboxId },
-                        { name: "S3_BUCKET", value: s3Bucket },
-                        { name: "AWS_DEFAULT_REGION", value: "ap-southeast-1" },
+                        {
+                            name: "SANDBOX_ID",
+                            value: sandboxid,
+                        },
                         {
                             name: "AWS_ACCESS_KEY_ID",
-                            valueFrom: { secretKeyRef: { name: "aws-credentials", key: "AWS_ACCESS_KEY_ID" } }
+                            value: process.env.AWS_ACCESS_KEY_ID,
                         },
                         {
                             name: "AWS_SECRET_ACCESS_KEY",
-                            valueFrom: { secretKeyRef: { name: "aws-credentials", key: "AWS_SECRET_ACCESS_KEY" } }
+                            value: process.env.AWS_SECRET_ACCESS_KEY,
                         },
+                        {
+                            name: "AWS_REGION",
+                            value: process.env.AWS_REGION,
+                        },
+                        {
+                            name: "S3_BUCKET",
+                            value: s3Bucket,
+                        },
+              
                     ],
                     resources: {
-                        limits: { cpu: "200m", memory: "256Mi" },
-                        requests: { cpu: "100m", memory: "128Mi" },
+                        limits: {
+                            cpu: "500m",
+                            memory: "256Mi",
+                        },
+                        requests: {
+                            cpu: "250m",
+                            memory: "128Mi",
+                        },
                     },
-                }
+                    volumeMounts: [
+                        {
+                            name: "code-volume",
+                            mountPath: "/workspace",
+                        },
+                    ],
+                },
             ],
             containers: [
-                // ── Vite preview ──────────────────────────────────────────────
+                //vite preview
                 {
-                    name: `sandbox-container-${sandboxId}`,
-                    image: "template:latest",
-                    imagePullPolicy: "IfNotPresent",
-                    command: [ "npm", "run", "dev" ],
-                    ports: [ { containerPort: 5173 } ],
-                    volumeMounts: [ { name: "code-volume", mountPath: "/workspace" } ],
-                    resources: {
-                        limits: { cpu: "500m", memory: "512Mi" },
-                        requests: { cpu: "250m", memory: "256Mi" },
+                    name: `sandbox-container-${sandboxid}`,
+                    image: 'template:latest',
+                    imagePullPolicy: "Always",
+                    command: ['npm', 'run', 'dev'],
+                    workingDir: "/workspace",
+                    ports: [
+                        {
+                            containerPort: 5173,
+                            name: "http",
+                        },
+                    ],
+                    readinessProbe: {
+                        tcpSocket: {
+                            port: 5173,
+                        },
+                        initialDelaySeconds: 2,
+                        periodSeconds: 3,
+                        failureThreshold: 30,
                     },
+                    resources: {
+                        limits: {
+                            cpu: "500m",
+                            memory: "256Mi",
+                        },
+                        requests: {
+                            cpu: "250m",
+                            memory: "128Mi",
+                        },
+                    },
+                    volumeMounts: [
+                        {
+                            name: "code-volume",
+                            mountPath: "/workspace",
+                        },
+                    ],
+
+
                 },
-                // ── Comm agent — NO AWS creds ─────────────────────────────────
+                //comm agent
                 {
-                    name: `sandbox-agent-${sandboxId}`,
+                    name: `sandbox-agent-${sandboxid}`,
                     image: "sandbox-agent:latest",
-                    imagePullPolicy: "IfNotPresent",
-                    command: [ "node", "server.js" ],
-                    ports: [ { containerPort: 3000 } ],
-                    volumeMounts: [ { name: "code-volume", mountPath: "/workspace" } ],
-                    resources: {
-                        limits: { cpu: "500m", memory: "512Mi" },
-                        requests: { cpu: "250m", memory: "256Mi" },
-                    },
-                },
-                // ── Sync watcher — AWS creds ONLY here ───────────────────────
-                {
-                    name: `sync-sidecar-${sandboxId}`,
-                    image: "sandbox-sync:latest",
-                    imagePullPolicy: "IfNotPresent",
-                    command: [ "node", "watch.js" ],  // separate script, just watches
-                    volumeMounts: [ { name: "code-volume", mountPath: "/workspace" } ],
+                    imagePullPolicy: "Always",
                     env: [
-                        { name: "SANDBOX_ID", value: sandboxId },
-                        { name: "S3_BUCKET", value: s3Bucket },
-                        { name: "AWS_DEFAULT_REGION", value: "ap-southeast-1" },
+                        {
+                            name: "SANDBOX_ID",
+                            value: sandboxid,
+                        },
                         {
                             name: "AWS_ACCESS_KEY_ID",
-                            valueFrom: { secretKeyRef: { name: "aws-credentials", key: "AWS_ACCESS_KEY_ID" } }
+                            value: process.env.AWS_ACCESS_KEY_ID,
                         },
                         {
                             name: "AWS_SECRET_ACCESS_KEY",
-                            valueFrom: { secretKeyRef: { name: "aws-credentials", key: "AWS_SECRET_ACCESS_KEY" } }
+                            value: process.env.AWS_SECRET_ACCESS_KEY,
+                        },
+                        {
+                            name: "AWS_REGION",
+                            value: process.env.AWS_REGION,
+                        },
+                        {
+                            name: "S3_BUCKET",
+                            value: s3Bucket,
+                        },
+
+                    ],
+                    ports: [
+                        {
+                            containerPort: 3000,
+                            name: "agent",
                         },
                     ],
-                    resources: {
-                        limits: { cpu: "100m", memory: "128Mi" },
-                        requests: { cpu: "50m", memory: "64Mi" },
+                    readinessProbe: {
+                        tcpSocket: {
+                            port: 3000,
+                        },
+                        initialDelaySeconds: 2,
+                        periodSeconds: 3,
+                        failureThreshold: 30,
                     },
+                    resources: {
+                        limits: {
+                            cpu: "500m",
+                            memory: "256Mi",
+                        },
+                        requests: {
+                            cpu: "250m",
+                            memory: "128Mi",
+                        },
+                    },
+                    volumeMounts: [
+                        {
+                            name: "code-volume",
+                            mountPath: "/workspace",
+                        },
+                    ],
                 },
+
             ],
-            // ── Single shared emptyDir volume ─────────────────────────────────
-            // All 3 containers + init container mount this at /app
             volumes: [
-                {
+             {
                     name: "code-volume",
                     emptyDir: {}
                 }
-            ]
-        }
+
+
+            ],
+
+
+        },
     };
 
-    try {
-        const response = await k8sApi.createNamespacedPod({
-            namespace: NAMESPACE,
-            body: podManifest,
-        });
-        console.log("Pod created:", response.metadata.name);
-        return response;
-    } catch (err) {
-        console.error("Error creating pod:", err);
-        throw err;
+    try{
+            const res = await k8sApi.createNamespacedPod({ namespace: "default", body: podmanifests });
+            console.log("pod created successfully");
+            return res;
+
+        }
+
+    catch(err) {
+            console.log("pod creation failed", err);
+            throw err;
+        }
+
+
+
+
     }
-};
+
+export const waitForPodReady = async (name, namespace = "default", timeoutMs = 180000) => {
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        try {
+            const pod = await k8sApi.readNamespacedPod({ name, namespace });
+            const containers = pod.status?.containerStatuses || [];
+            const ready = pod.status?.phase === "Running" &&
+                containers.length > 0 &&
+                containers.every((c) => c.ready);
+
+            if (ready) {
+                console.log(`pod ${name} is ready`);
+                return pod;
+            }
+
+            const failing = containers.find((c) => c.state?.waiting?.reason === "CrashLoopBackOff" || c.state?.terminated);
+            if (failing) {
+                throw new Error(`container ${failing.name} failed: ${JSON.stringify(failing.state)}`);
+            }
+        } catch (err) {
+            if (err?.code !== 404) {
+                console.log("pod status check failed", err.message);
+                throw err;
+            }
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    throw new Error(`pod ${name} did not become ready within ${timeoutMs}ms`);
+}
+
+
+
+
