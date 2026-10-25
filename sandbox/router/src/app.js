@@ -7,28 +7,44 @@ app.get('/router/health', (req, res) => {
     res.send('req is healthy ')
 })
 
-const proxies = new Map()
+const proxies = {}
+const agentProxies ={}
 
-const proxyFor = (sandboxid) => {
-    if (!proxies.has(sandboxid)) {
-        proxies.set(sandboxid, createProxyMiddleware({
+function getproxies(sandboxid){
+    if (!proxies[sandboxid]) {
+        proxies[sandboxid] = createProxyMiddleware({
+            target: `http://sandbox-service-${sandboxid}:80`,
+            changeOrigin: true,
+            ws: true,
+          
+        })
+    }
+    return proxies[sandboxid]
+}
+function getagentproxies(sandboxid){
+    if (!agentProxies[sandboxid]) {
+        agentProxies[sandboxid] = createProxyMiddleware({
             target: `http://sandbox-service-${sandboxid}:3000`,
             changeOrigin: true,
             ws: true,
-            proxyTimeout: 3600000,
-            timeout: 3600000,
-        }))
+        
+        })
     }
-    return proxies.get(sandboxid)
+    return agentProxies[sandboxid]
 }
 
 app.use((req, res, next) => {
     const host = req.headers.host || ''
-    const sandboxid = host.split('.')[0]
-    if (!sandboxid) {
-        return res.status(400).json({ message: 'missing sandbox id in host' })
+    const [firstLabel, secondLabel] = host.split('.')
+
+    if (secondLabel === 'agent' || firstLabel.endsWith('-agent')) {
+        const sandboxid = secondLabel === 'agent'
+            ? firstLabel
+            : firstLabel.slice(0, -'-agent'.length)
+        return getagentproxies(sandboxid)(req, res, next)
     }
-    return proxyFor(sandboxid)(req, res, next)
+
+    return getproxies(firstLabel)(req, res, next)
 })
 
 export default app

@@ -1,4 +1,4 @@
-import {k8sApi , k8sNetworking} from './config.js';
+import {k8sApi , k8sNetworking, k8sDiscovery} from './config.js';
 
 export const createservice = async(sandboxid)=>{
     const servicebody = {
@@ -13,13 +13,20 @@ export const createservice = async(sandboxid)=>{
                 app: sandboxid,
             },
             ports:[
-                {
-                    port: 3000,
-                    targetPort: 5173,
+                {   
                     name: "http",
+                    port: 80,
+                    targetPort: 5173,
+                    protocol: "TCP",
+                },
+                {
+                    name: "agent",
+                    port: 3000,
+                    targetPort: 3000,
+                    protocol: "TCP",
                 },
             ],
-            type: "LoadBalancer",
+            type: "ClusterIP",
         },
     };
 
@@ -35,22 +42,33 @@ export const createservice = async(sandboxid)=>{
 }
 
 
-export const waitForServiceReachable = async (serviceName, port = 3000, timeoutMs = 60000) => {
+export const waitForServiceReachable = async (serviceName, port = 3000, timeoutMs = 60000, namespace = "default") => {
     const deadline = Date.now() + timeoutMs;
     let lastError = "no attempt made";
 
     while (Date.now() < deadline) {
         try {
-            const res = await fetch(`http://${serviceName}:${port}/`, {
-                signal: AbortSignal.timeout(3000),
+            const slices = await k8sDiscovery.listNamespacedEndpointSlice({
+                namespace,
+                labelSelector: `kubernetes.io/service-name=${serviceName}`,
             });
 
-            if (res.status < 500) {
-                console.log(`service ${serviceName} is reachable (status ${res.status})`);
+            const items = slices.items || [];
+            const readyEndpointCount = items.reduce(
+                (count, slice) =>
+                    count + (slice.endpoints || []).filter((ep) => ep.conditions?.ready !== false).length,
+                0
+            );
+            const exposesPort = items.some((slice) =>
+                (slice.ports || []).some((p) => p.port === port)
+            );
+
+            if (readyEndpointCount > 0 && exposesPort) {
+                console.log(`service ${serviceName} is reachable (${readyEndpointCount} ready endpoint(s) on port ${port})`);
                 return;
             }
 
-            lastError = `status ${res.status}`;
+            lastError = `no ready endpoints on port ${port}`;
         } catch (err) {
             lastError = err.message;
         }

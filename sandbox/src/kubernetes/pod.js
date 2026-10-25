@@ -13,49 +13,25 @@ export const createpod = async (sandboxid, s3Bucket) => {
             initContainers: [
                 {
                     name: `sync-init-${sandboxid}`,
-                    image: `sandbox-sync:latest`,
+                    image: `template:latest`,
                     imagePullPolicy: "Always",
-                    command: ["node", "seed.js"],
-                    env: [
-                        {
-                            name: "SANDBOX_ID",
-                            value: sandboxid,
-                        },
-                        {
-                            name: "AWS_ACCESS_KEY_ID",
-                            value: process.env.AWS_ACCESS_KEY_ID,
-                        },
-                        {
-                            name: "AWS_SECRET_ACCESS_KEY",
-                            value: process.env.AWS_SECRET_ACCESS_KEY,
-                        },
-                        {
-                            name: "AWS_REGION",
-                            value: process.env.AWS_REGION,
-                        },
-                        {
-                            name: "S3_BUCKET",
-                            value: s3Bucket,
-                        },
-              
-                    ],
-                    resources: {
-                        limits: {
-                            cpu: "500m",
-                            memory: "256Mi",
-                        },
-                        requests: {
-                            cpu: "250m",
-                            memory: "128Mi",
-                        },
-                    },
+                    command: ['sh', '-c', 'cp -r /workspace/. /seed/'],
                     volumeMounts: [
                         {
                             name: "code-volume",
-                            mountPath: "/workspace",
+                            mountPath: "/seed",
+
                         },
                     ],
                 },
+            ],
+                    volumes: [
+             {
+                    name: "code-volume",// it create empty shared volumes for pods
+                    emptyDir: {}
+                }
+
+
             ],
             containers: [
                 //vite preview
@@ -91,7 +67,7 @@ export const createpod = async (sandboxid, s3Bucket) => {
                     },
                     volumeMounts: [
                         {
-                            name: "code-volume",
+                            name: "code-volume",// vite sync with code-volume to update code automatically
                             mountPath: "/workspace",
                         },
                     ],
@@ -100,8 +76,8 @@ export const createpod = async (sandboxid, s3Bucket) => {
                 },
                 //comm agent
                 {
-                    name: `sandbox-agent-${sandboxid}`,
-                    image: "sandbox-agent:latest",
+                    name: `agent-${sandboxid}`,
+                    image: "agent:latest",
                     imagePullPolicy: "Always",
                     env: [
                         {
@@ -152,21 +128,14 @@ export const createpod = async (sandboxid, s3Bucket) => {
                     },
                     volumeMounts: [
                         {
-                            name: "code-volume",
+                            name: "code-volume",// it also now connect with code-volume now both vite and agent sync with each other
                             mountPath: "/workspace",
                         },
                     ],
                 },
 
             ],
-            volumes: [
-             {
-                    name: "code-volume",
-                    emptyDir: {}
-                }
-
-
-            ],
+    
 
 
         },

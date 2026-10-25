@@ -12,5 +12,6 @@ if (Currentcluster?.server?.startsWith("https")) {
 
 const k8sApi = kc.makeApiClient(k8s.CoreV1Api);
 const k8sNetworking = kc.makeApiClient(k8s.NetworkingV1Api);
+const k8sDiscovery = kc.makeApiClient(k8s.DiscoveryV1Api);
 
-export  {k8sApi,k8sNetworking}
+export  {k8sApi,k8sNetworking,k8sDiscovery}
