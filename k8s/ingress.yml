@@ -34,6 +34,22 @@ spec:
             name: router-service
             port:
               number: 80
+      - pathType: Prefix
+        path: /ai/health
+        backend:
+          service:
+            name: ai-service
+            port:
+              number: 80
+      - pathType: Prefix
+        path: /ai/generate
+        backend:
+          service:
+            name: ai-service
+            port:
+              number: 80
+
+
   - host: "*.preview.localhost"
     http:
       paths:

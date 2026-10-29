@@ -3,7 +3,7 @@ import { tool } from "langchain"
 import axios from "axios"
 
 const getAgentBaseUrl = () =>
-    `http://${process.env.SANDBOX_ID ?? "d2e6828c-a3d7-4f65-a39e-0f46febbf088"}.agent.localhost`
+    `http://${process.env.SANDBOX_ID ?? "61331ee5-d4d0-4a33-bbd8-e1e6064c230b"}.agent.localhost`
 
 const listfiles = tool(
     async () => {
@@ -24,6 +24,7 @@ const listfiles = tool(
 
 const readfiles = tool(
     async ({ filepath }) => {
+        console.log("readfile started")
         try {
             const paths = Array.isArray(filepath)
                 ? filepath
@@ -47,6 +48,7 @@ const readfiles = tool(
 
 const updatefile = tool(
     async ({ filepath, content }) => {
+        console.log("updatefile started")
         try {
             const { data } = await axios.patch(`${getAgentBaseUrl()}/update-files`, {
                 files: [{ filepath, content }],

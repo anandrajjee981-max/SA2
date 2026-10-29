@@ -31,14 +31,10 @@ const agent = createAgent({
     
     the ui should be minimal but modern
     maintain correct responsive and good ui for all the task 
-    
+    you should use gsap library which is available in the sandbox listfiles
     
     `,
     description: "You are a helpful assistant. You have to make snake food game with existing react code",
 })
 
-const res = await agent.invoke({
-    messages: [{ role: "user", content: "you have to make snake food game with existing react code" }],
-})
-
-console.log(res)
+export default agent

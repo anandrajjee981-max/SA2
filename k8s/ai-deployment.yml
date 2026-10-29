@@ -1,0 +1,48 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-deployment
+  labels:
+    name: ai-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai
+  template:
+    metadata:
+      labels:
+        app: ai
+    spec:
+      containers:
+        - image: ai:latest
+          name: ai
+          resources:
+            requests:
+              cpu: "20m"
+              memory: "55M"
+            limits:
+              cpu: "50m"
+              memory: "100M"
+          env:
+            - name: OPENROUTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ai-secret
+                  key: openrouter_key
+          livenessProbe:
+            httpGet:
+              path: /ai/health
+              port: 3000
+            initialDelaySeconds: 90
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ai/health
+              port: 3000
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+          ports:
+            - containerPort: 3000
+              name: ai

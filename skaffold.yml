@@ -1,10 +1,14 @@
 apiVersion: skaffold/v4beta13
 kind: Config
-
 metadata:
   name: capstone
 
 build:
+  # Add this tagPolicy block to force custom or "latest" tags
+  tagPolicy:
+    envTemplate:
+      template: "{{.IMAGE_NAME}}:latest"
+      
   artifacts:
   - image: sandbox
     context: sandbox
@@ -19,17 +23,10 @@ build:
         - src: 'server.js'
           dest: .
 
-  - image: sandbox-agent
-    context: sandbox-agents/comm-agent
+  - image: agent
+    context: sandbox/agent
     docker:
       dockerfile: dockerfile
-
-# NOTE: build context is repo root so dockerfile can COPY ../template
-  - image: sandbox-sync
-    context: .
-    docker:
-      dockerfile: sandbox-agents/sync-agent/dockerfile
-
 
   - image: template
     context: sandbox/template
@@ -41,11 +38,19 @@ build:
     docker:
       dockerfile: dockerfile
 
+  - image: ai
+    context: Ai
+    docker:
+      dockerfile: dockerfile
+
 manifests:
   rawYaml:
     - k8s/sandbox-deployment.yml
     - k8s/sandbox-service.yml
     - k8s/router-deployment.yml
     - k8s/router-service.yml
-    - k8s/ingress.yml 
+    - k8s/ingress.yml
     - k8s/rbac.yaml
+    - k8s/ai-secret.yml
+    - k8s/ai-deployment.yml
+    - k8s/ai-service.yml
